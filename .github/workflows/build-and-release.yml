@@ -89,9 +89,11 @@ jobs:
           grep "<Version>" solution-src/Other/Solution.xml
 
       # ── 7. Install PAC CLI ─────────────────────────────────────────────────
-      # actions-install only installs the CLI tools — no env connection needed.
+      # Installs the Power Platform CLI as a .NET global tool (no auth needed).
       - name: Install Power Platform CLI (pac)
-        uses: microsoft/powerplatform-actions/actions-install@v1
+        run: |
+          dotnet tool install --global Microsoft.PowerApps.CLI.Tool
+          echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
       # ── 8. Pack — UNMANAGED ────────────────────────────────────────────────
       - name: Pack unmanaged solution
