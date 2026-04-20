@@ -56,16 +56,61 @@ jobs:
       # ── 4. Copy built assets into the solution source tree ─────────────────
       # The solution stores the Code App bundle under:
       #   solution-src/CanvasApps/abra__988ca_CodeAppPackages/
-      # We replace the old assets with the freshly built ones.
+      # We replace the old assets with the freshly built ones, then update
+      # the <CodeAppPackageUris> manifest in meta.xml so pac knows which
+      # files to pack (Vite produces new hash-based filenames each build).
       - name: Update solution source with latest build
         run: |
           DEST="solution-src/CanvasApps/abra__988ca_CodeAppPackages"
+          META="solution-src/CanvasApps/abra__988ca.meta.xml"
+
           # Remove old assets
           rm -rf "${DEST}/assets" "${DEST}/index.html" "${DEST}/vite.svg"
+
           # Copy new build output
           cp -r dist/. "${DEST}/"
-          echo "Updated ${DEST} with new build"
-          ls -la "${DEST}"
+          echo "Updated ${DEST} with new build:"
+          find "${DEST}" -type f
+
+          # ── Regenerate <CodeAppPackageUris> in meta.xml ──
+          # Map file extensions to MIME content types
+          mime_for() {
+            case "$1" in
+              *.html) echo "text/html" ;;
+              *.css)  echo "text/css" ;;
+              *.js)   echo "application/javascript" ;;
+              *.svg)  echo "image/svg+xml" ;;
+              *.png)  echo "image/png" ;;
+              *.ico)  echo "image/x-icon" ;;
+              *.json) echo "application/json" ;;
+              *)      echo "application/octet-stream" ;;
+            esac
+          }
+
+          # Build new URI entries from all files in the CodeAppPackages dir
+          URIS=""
+          while IFS= read -r file; do
+            REL="${file#solution-src/}"
+            MIME=$(mime_for "$file")
+            URIS="${URIS}    <CodeAppPackageUri>/${REL}_ContentType_${MIME}</CodeAppPackageUri>\n"
+          done < <(find "${DEST}" -type f | sort)
+
+          # Replace the entire <CodeAppPackageUris> block in meta.xml
+          python3 -c "
+          import re, sys
+          meta = open('${META}', 'r').read()
+          new_block = '  <CodeAppPackageUris>\n${URIS}  </CodeAppPackageUris>'
+          meta = re.sub(
+              r'  <CodeAppPackageUris>.*?</CodeAppPackageUris>',
+              new_block,
+              meta,
+              flags=re.DOTALL
+          )
+          open('${META}', 'w').write(meta)
+          "
+
+          echo "Updated meta.xml CodeAppPackageUris:"
+          grep "CodeAppPackageUri" "${META}"
 
       # ── 5. Version calculation ─────────────────────────────────────────────
       # Version format:  1.0.0.<github_run_number>
