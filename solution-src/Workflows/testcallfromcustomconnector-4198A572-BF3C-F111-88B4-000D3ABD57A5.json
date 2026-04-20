@@ -1,0 +1,226 @@
+{
+  "properties": {
+    "connectionReferences": {},
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        }
+      },
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "kind": "PowerAppV2",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {},
+              "required": []
+            }
+          },
+          "metadata": {
+            "operationMetadataId": "ae890b71-773d-4c3a-bcde-528e845c14dd"
+          }
+        }
+      },
+      "actions": {
+        "Compose": {
+          "type": "Compose",
+          "inputs": [
+            {
+              "id": 1,
+              "name": "מחשב נייד",
+              "category": "מחשוב",
+              "description": "מחשב נייד לביצוע בדיקות, התקנות וגישה למערכות",
+              "quantity": 1,
+              "serial_number": "SN-LAP-001",
+              "status": "פעיל",
+              "location": "מחסן מרכזי",
+              "assigned_to": "טכנאי א'"
+            },
+            {
+              "id": 2,
+              "name": "מולטימטר",
+              "category": "חשמל",
+              "description": "מדידת מתח, זרם והתנגדות",
+              "quantity": 1,
+              "serial_number": "SN-MUL-002",
+              "status": "בתיקון",
+              "location": "מעבדה",
+              "assigned_to": "טכנאי ב'"
+            },
+            {
+              "id": 3,
+              "name": "מברגים",
+              "category": "כלי עבודה",
+              "description": "סט מברגים שטוחים ופיליפס",
+              "quantity": 1,
+              "serial_number": "SN-SCR-003",
+              "status": "פעיל",
+              "location": "רכב שירות 1",
+              "assigned_to": "טכנאי ג'"
+            },
+            {
+              "id": 4,
+              "name": "כבל רשת",
+              "category": "תקשורת",
+              "description": "כבל Ethernet לחיבור לרשת",
+              "quantity": 3,
+              "serial_number": "SN-NET-004",
+              "status": "פעיל",
+              "location": "מחסן מרכזי",
+              "assigned_to": "ללא שיוך"
+            },
+            {
+              "id": 5,
+              "name": "טסטר",
+              "category": "חשמל",
+              "description": "בדיקת קיום מתח בשקע",
+              "quantity": 1,
+              "serial_number": "SN-TST-005",
+              "status": "אבוד",
+              "location": "לא ידוע",
+              "assigned_to": "טכנאי ד'"
+            },
+            {
+              "id": 6,
+              "name": "פנס",
+              "category": "ציוד כללי",
+              "description": "פנס עבודה לתנאי תאורה נמוכים",
+              "quantity": 1,
+              "serial_number": "SN-FLS-006",
+              "status": "פעיל",
+              "location": "רכב שירות 2",
+              "assigned_to": "טכנאי ה'"
+            },
+            {
+              "id": 7,
+              "name": "ערכת כבלים ומתאמים",
+              "category": "תקשורת",
+              "description": "כולל USB, HDMI, מתאמים שונים",
+              "quantity": 1,
+              "serial_number": "SN-ADP-007",
+              "status": "פעיל",
+              "location": "מחסן מרכזי",
+              "assigned_to": "טכנאי ו'"
+            },
+            {
+              "id": 8,
+              "name": "כפפות עבודה",
+              "category": "בטיחות",
+              "description": "הגנה על הידיים בזמן עבודה",
+              "quantity": 2,
+              "serial_number": "SN-GLV-008",
+              "status": "פעיל",
+              "location": "רכב שירות 3",
+              "assigned_to": "טכנאי ז'"
+            },
+            {
+              "id": 9,
+              "name": "אזיקונים",
+              "category": "אביזרים",
+              "description": "לסידור וניהול כבלים",
+              "quantity": 20,
+              "serial_number": "SN-ZIP-009",
+              "status": "פעיל",
+              "location": "מחסן מרכזי",
+              "assigned_to": "ללא שיוך"
+            },
+            {
+              "id": 10,
+              "name": "מטען נייד",
+              "category": "חשמל",
+              "description": "סוללה ניידת להטענת מכשירים",
+              "quantity": 1,
+              "serial_number": "SN-PWR-010",
+              "status": "בהשאלה",
+              "location": "רכב שירות 1",
+              "assigned_to": "טכנאי ח'"
+            }
+          ],
+          "runAfter": {
+            "Initialize_variable": [
+              "SUCCEEDED"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "e0b0e219-43ed-4246-b0bb-acb07456ce03"
+          }
+        },
+        "Respond_to_a_Power_App_or_flow": {
+          "type": "Response",
+          "kind": "PowerApp",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "response": {
+                  "title": "response",
+                  "x-ms-dynamically-added": true,
+                  "type": "string"
+                }
+              },
+              "additionalProperties": {}
+            },
+            "statusCode": 200,
+            "body": {
+              "response": "@{outputs('Compose')}"
+            }
+          },
+          "runAfter": {
+            "Do_until": [
+              "SUCCEEDED"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "57f2cf87-5c94-404f-929a-073f5a89aaf0"
+          }
+        },
+        "Do_until": {
+          "type": "Until",
+          "expression": "@equals(variables('ttt'),20)",
+          "limit": {
+            "count": 60,
+            "timeout": "PT1H"
+          },
+          "actions": {
+            "Increment_variable": {
+              "type": "IncrementVariable",
+              "inputs": {
+                "name": "ttt",
+                "value": 1
+              }
+            }
+          },
+          "runAfter": {
+            "Compose": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Initialize_variable": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "ttt",
+                "type": "integer",
+                "value": 0
+              }
+            ]
+          },
+          "runAfter": {}
+        }
+      }
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}

@@ -2,38 +2,33 @@
 # Power Platform Code App — Build & Release
 #
 # Triggered on every push to main.
+# NO Power Platform environment connection required.
+#
 # Steps:
-#   1. Build the React/TypeScript code app
-#   2. Push the built app to Power Platform (updates the live app)
-#   3. Bump the solution version  →  1.0.0.<run_number>
-#   4. Export unmanaged solution  →  for dev environments
-#   5. Export managed solution    →  for production environments
-#   6. Create a GitHub Release with both zip packages
+#   1. npm ci + npm run build  (TypeScript → Vite bundle)
+#   2. Copy built dist/ into solution-src/ (replaces old Code App assets)
+#   3. Bump <Version> in solution-src/Other/Solution.xml → 1.0.0.<run_number>
+#   4. pac solution pack → unmanaged zip
+#   5. pac solution pack --managed → managed zip
+#   6. Create a GitHub Release with both zip packages attached
 #
-# Required GitHub Secrets:
-#   PP_APP_ID        – Azure AD App Registration (Service Principal) client ID
-#   PP_CLIENT_SECRET – Service Principal client secret
-#   PP_TENANT_ID     – Azure AD tenant ID
-#
-# How to create a Service Principal:
-#   https://learn.microsoft.com/en-us/power-platform/alm/devops-build-tools
+# No secrets required.
 # ──────────────────────────────────────────────────────────────────────────────
 
-name: Build & Export Power Platform Solution
+name: Build & Package Solution
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:   # allow manual trigger from GitHub UI
+  workflow_dispatch:
 
 env:
   SOLUTION_NAME: codeapps_powerplatform
-  ENVIRONMENT_URL: https://org3b820678.crm4.dynamics.com/
   NODE_VERSION: '22'
 
 jobs:
   build-and-release:
-    name: Build, Deploy & Package
+    name: Build, Pack & Release
     runs-on: ubuntu-latest
 
     permissions:
@@ -58,85 +53,70 @@ jobs:
       - name: Build code app (TypeScript → Vite bundle)
         run: npm run build
 
-      # ── 4. Version calculation ─────────────────────────────────────────────
-      # Version format:  <package.json major.minor.patch>.<github_run_number>
-      # Example:  1.0.0.7   (7th workflow run)
-      - name: Calculate solution version
+      # ── 4. Copy built assets into the solution source tree ─────────────────
+      # The solution stores the Code App bundle under:
+      #   solution-src/CanvasApps/abra__988ca_CodeAppPackages/
+      # We replace the old assets with the freshly built ones.
+      - name: Update solution source with latest build
+        run: |
+          DEST="solution-src/CanvasApps/abra__988ca_CodeAppPackages"
+          # Remove old assets
+          rm -rf "${DEST}/assets" "${DEST}/index.html" "${DEST}/vite.svg"
+          # Copy new build output
+          cp -r dist/. "${DEST}/"
+          echo "Updated ${DEST} with new build"
+          ls -la "${DEST}"
+
+      # ── 5. Version calculation ─────────────────────────────────────────────
+      # Version format:  1.0.0.<github_run_number>
+      # e.g. first run → 1.0.0.1,  second run → 1.0.0.2  etc.
+      - name: Calculate version
         id: ver
         run: |
           BASE=$(node -p "require('./package.json').version")
           REV=${{ github.run_number }}
           PP_VER="${BASE}.${REV}"
-          TAG="v${BASE}-build.${REV}"
+          TAG="v${PP_VER}"
           echo "pp_version=${PP_VER}" >> $GITHUB_OUTPUT
           echo "tag=${TAG}"           >> $GITHUB_OUTPUT
-          echo "::notice::Solution version → ${PP_VER}"
+          echo "Version: ${PP_VER}"
 
-      # ── 5. Authenticate to Power Platform ──────────────────────────────────
-      # Uses Service Principal. Installs PAC CLI and configures auth for all
-      # subsequent powerplatform-actions steps AND bare `pac` CLI commands.
-      - name: Authenticate to Power Platform
-        uses: microsoft/powerplatform-actions/who-am-i@v1
-        with:
-          environment-url: ${{ env.ENVIRONMENT_URL }}
-          app-id:          ${{ secrets.PP_APP_ID }}
-          client-secret:   ${{ secrets.PP_CLIENT_SECRET }}
-          tenant-id:       ${{ secrets.PP_TENANT_ID }}
-
-      # ── 6. Push Code App ───────────────────────────────────────────────────
-      # Deploys the built dist/ to Power Platform.
-      # Uses @microsoft/power-apps local CLI (supports workflowDetails field
-      # in power.config.json which PAC CLI older versions strip out).
-      - name: Push Code App to Power Platform
-        run: node_modules/.bin/power-apps push
-
-      # ── 7. Set solution version ────────────────────────────────────────────
-      # pac CLI is already installed and authenticated by the who-am-i step above.
-      - name: Bump solution version to ${{ steps.ver.outputs.pp_version }}
+      # ── 6. Bump <Version> in Solution.xml ──────────────────────────────────
+      - name: Bump Solution.xml version to ${{ steps.ver.outputs.pp_version }}
         run: |
-          pac solution set-version \
-            --solution-name "${{ env.SOLUTION_NAME }}" \
-            --solution-version "${{ steps.ver.outputs.pp_version }}"
+          sed -i "s|<Version>[^<]*</Version>|<Version>${{ steps.ver.outputs.pp_version }}</Version>|" \
+            solution-src/Other/Solution.xml
+          grep "<Version>" solution-src/Other/Solution.xml
 
-      # ── 8. Create artifacts directory ──────────────────────────────────────
-      - name: Create artifacts directory
-        run: mkdir -p artifacts
+      # ── 7. Install PAC CLI ─────────────────────────────────────────────────
+      # actions-install only installs the CLI tools — no env connection needed.
+      - name: Install Power Platform CLI (pac)
+        uses: microsoft/powerplatform-actions/actions-install@v1
 
-      # ── 9. Export — UNMANAGED ──────────────────────────────────────────────
-      # Unmanaged = for development environments (can be customised after import)
-      - name: Export unmanaged solution
-        uses: microsoft/powerplatform-actions/export-solution@v1
-        with:
-          environment-url:      ${{ env.ENVIRONMENT_URL }}
-          app-id:               ${{ secrets.PP_APP_ID }}
-          client-secret:        ${{ secrets.PP_CLIENT_SECRET }}
-          tenant-id:            ${{ secrets.PP_TENANT_ID }}
-          solution-name:        ${{ env.SOLUTION_NAME }}
-          solution-output-file: artifacts/${{ env.SOLUTION_NAME }}_${{ steps.ver.outputs.pp_version }}_unmanaged.zip
-          managed:              false
+      # ── 8. Pack — UNMANAGED ────────────────────────────────────────────────
+      - name: Pack unmanaged solution
+        run: |
+          pac solution pack \
+            --zipfile "artifacts/${{ env.SOLUTION_NAME }}_${{ steps.ver.outputs.pp_version }}_unmanaged.zip" \
+            --folder  solution-src \
+            --packagetype Unmanaged
 
-      # ── 10. Export — MANAGED ───────────────────────────────────────────────
-      # Managed = for production environments (locked, no customisation allowed)
-      - name: Export managed solution
-        uses: microsoft/powerplatform-actions/export-solution@v1
-        with:
-          environment-url:      ${{ env.ENVIRONMENT_URL }}
-          app-id:               ${{ secrets.PP_APP_ID }}
-          client-secret:        ${{ secrets.PP_CLIENT_SECRET }}
-          tenant-id:            ${{ secrets.PP_TENANT_ID }}
-          solution-name:        ${{ env.SOLUTION_NAME }}
-          solution-output-file: artifacts/${{ env.SOLUTION_NAME }}_${{ steps.ver.outputs.pp_version }}_managed.zip
-          managed:              true
+      # ── 9. Pack — MANAGED ─────────────────────────────────────────────────
+      - name: Pack managed solution
+        run: |
+          pac solution pack \
+            --zipfile "artifacts/${{ env.SOLUTION_NAME }}_${{ steps.ver.outputs.pp_version }}_managed.zip" \
+            --folder  solution-src \
+            --packagetype Managed
 
-      # ── 11. Upload as workflow artifacts ───────────────────────────────────
-      # Accessible from the Actions run even without creating a full release.
-      - name: Upload solution packages as artifacts
+      # ── 10. Upload as workflow artifacts ───────────────────────────────────
+      - name: Upload solution packages as workflow artifacts
         uses: actions/upload-artifact@v4
         with:
           name: solution-${{ steps.ver.outputs.pp_version }}
           path: artifacts/
 
-      # ── 12. GitHub Release ─────────────────────────────────────────────────
+      # ── 11. GitHub Release ─────────────────────────────────────────────────
       - name: Create GitHub Release ${{ steps.ver.outputs.tag }}
         uses: softprops/action-gh-release@v2
         with:
@@ -148,13 +128,15 @@ jobs:
 
             Auto-built from commit [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
 
-            | Package | Purpose |
-            |---------|---------|
-            | `${{ env.SOLUTION_NAME }}_${{ steps.ver.outputs.pp_version }}_unmanaged.zip` | **פיתוח** — import into dev/test environments, customisable |
-            | `${{ env.SOLUTION_NAME }}_${{ steps.ver.outputs.pp_version }}_managed.zip`   | **ייצור** — import into production environments, locked |
+            ### How to install
 
-            ### What's included
-            - ✅ Code App: מערכת ציוד טכני (React + Vite + Tailwind)
-            - ✅ Power Automate Flow: test call from custom connector
-            - ✅ Connection reference: Logic flows
+            | Package | When to use |
+            |---------|-------------|
+            | `${{ env.SOLUTION_NAME }}_${{ steps.ver.outputs.pp_version }}_unmanaged.zip` | **פיתוח / Dev** — import into dev/test, fully customisable |
+            | `${{ env.SOLUTION_NAME }}_${{ steps.ver.outputs.pp_version }}_managed.zip`   | **ייצור / Prod** — import into production, locked & managed |
+
+            **Import steps:**
+            1. [make.powerapps.com](https://make.powerapps.com) → Solutions → Import Solution
+            2. Upload the zip → Next → Import
           files: artifacts/*.zip
+
