@@ -149,12 +149,16 @@ jobs:
             --packagetype Unmanaged
 
       # ── 9. Pack — MANAGED ─────────────────────────────────────────────────
+      # pac requires <Managed>1</Managed> to pack as Managed.
+      # We flip the flag, pack, then restore it.
       - name: Pack managed solution
         run: |
+          sed -i 's|<Managed>0</Managed>|<Managed>1</Managed>|' solution-src/Other/Solution.xml
           pac solution pack \
             --zipfile "artifacts/${{ env.SOLUTION_NAME }}_${{ steps.ver.outputs.pp_version }}_managed.zip" \
             --folder  solution-src \
             --packagetype Managed
+          sed -i 's|<Managed>1</Managed>|<Managed>0</Managed>|' solution-src/Other/Solution.xml
 
       # ── 10. Upload as workflow artifacts ───────────────────────────────────
       - name: Upload solution packages as workflow artifacts
