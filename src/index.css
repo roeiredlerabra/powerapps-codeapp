@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Segoe UI', system-ui, Arial, sans-serif;
+}
+
+body {
+  background-color: #f5f6fa;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

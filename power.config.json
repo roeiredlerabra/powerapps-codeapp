@@ -1,0 +1,27 @@
+{
+  "version": "1.0",
+  "appId": "26074970-becf-4e66-aacc-15e8b0a5838c",
+  "appDisplayName": "מערכת ציוד טכני",
+  "region": "prod",
+  "environmentId": "e179aff1-bcc3-e311-8436-cdb56678bf53",
+  "description": " ",
+  "buildPath": "./dist",
+  "buildEntryPoint": "index.html",
+  "localAppUrl": "http://localhost:3000",
+  "logoPath": "Default",
+  "connectionReferences": {
+    "4d93f509-2691-4b92-bfcb-b5b08df47698": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+      "displayName": "Logic flows",
+      "dataSources": [
+        "testcallfromcustomconnector"
+      ],
+      "workflowDetails": {
+        "workflowEntityId": "4198a572-bf3c-f111-88b4-000d3abd57a5",
+        "workflowDisplayName": "test call from custom connector",
+        "workflowName": "e312e07f-a735-4d55-8609-1d207d41902e"
+      }
+    }
+  },
+  "databaseReferences": {}
+}
