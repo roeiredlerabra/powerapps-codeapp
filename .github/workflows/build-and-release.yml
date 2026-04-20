@@ -91,15 +91,12 @@ jobs:
         run: node_modules/.bin/power-apps push
 
       # ── 7. Set solution version ────────────────────────────────────────────
+      # pac CLI is already installed and authenticated by the who-am-i step above.
       - name: Bump solution version to ${{ steps.ver.outputs.pp_version }}
-        uses: microsoft/powerplatform-actions/set-solution-version@v1
-        with:
-          environment-url: ${{ env.ENVIRONMENT_URL }}
-          app-id:          ${{ secrets.PP_APP_ID }}
-          client-secret:   ${{ secrets.PP_CLIENT_SECRET }}
-          tenant-id:       ${{ secrets.PP_TENANT_ID }}
-          solution-name:   ${{ env.SOLUTION_NAME }}
-          solution-version: ${{ steps.ver.outputs.pp_version }}
+        run: |
+          pac solution set-version \
+            --solution-name "${{ env.SOLUTION_NAME }}" \
+            --solution-version "${{ steps.ver.outputs.pp_version }}"
 
       # ── 8. Create artifacts directory ──────────────────────────────────────
       - name: Create artifacts directory
