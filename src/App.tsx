@@ -337,26 +337,27 @@ export default function App() {
       <CategoryDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} items={items} />
 
       {/* Toolbar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-3 relative z-10">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          {/* Search */}
-          <div className="relative w-full sm:max-w-xs">
-            <IconSearch size={15} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="חיפוש חופשי..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pr-8 pl-3 py-2 border border-gray-200 rounded-lg text-sm bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition"
-            />
-          </div>
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-4 space-y-3 relative z-10">
+        {/* Row 1: Search full width on desktop */}
+        <div className="relative w-full">
+          <IconSearch size={15} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="חיפוש חופשי..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pr-8 pl-3 py-2 border border-gray-200 rounded-lg text-sm bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition"
+          />
+        </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+        {/* Row 2: Filters spread full width */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap flex-1">
             {/* Category filter */}
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="border border-gray-200 rounded-lg text-sm bg-white px-2.5 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition cursor-pointer"
+              className="border border-gray-200 rounded-lg text-sm bg-white px-2.5 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition cursor-pointer flex-1 min-w-[120px]"
             >
               <option value="">כל הקטגוריות</option>
               {categories.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -366,7 +367,7 @@ export default function App() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="border border-gray-200 rounded-lg text-sm bg-white px-2.5 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition cursor-pointer"
+              className="border border-gray-200 rounded-lg text-sm bg-white px-2.5 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition cursor-pointer flex-1 min-w-[120px]"
             >
               <option value="">כל הסטטוסים</option>
               {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -376,7 +377,7 @@ export default function App() {
             <select
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
-              className="border border-gray-200 rounded-lg text-sm bg-white px-2.5 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition cursor-pointer"
+              className="border border-gray-200 rounded-lg text-sm bg-white px-2.5 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition cursor-pointer flex-1 min-w-[120px]"
             >
               <option value="">כל המיקומים</option>
               {locations.map((l) => <option key={l} value={l}>{l}</option>)}
@@ -394,8 +395,8 @@ export default function App() {
             )}
           </div>
 
-          {/* Spacer + Chart button + Count */}
-          <div className="flex items-center gap-3 sm:mr-auto">
+          {/* Chart button + Count */}
+          <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={() => setDrawerOpen(true)}
               disabled={items.length === 0}
@@ -405,7 +406,7 @@ export default function App() {
               <span className="hidden sm:inline">פילוח</span>
             </button>
             {loadState === 'loaded' && (
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-gray-500 whitespace-nowrap">
                 {filtered.length} פריט{filtered.length !== 1 ? 'ים' : ''}
                 {hasActiveFilters && <span className="text-indigo-500 mr-1">
                   <IconFilter size={13} className="inline -mt-0.5" /> מסונן
