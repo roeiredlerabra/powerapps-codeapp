@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   IconDeviceLaptop,
   IconRefresh,
@@ -6,6 +6,10 @@ import {
   IconLoader2,
   IconAlertCircle,
   IconPackage,
+  IconChartPie,
+  IconX,
+  IconFilter,
+  IconFilterOff,
 } from '@tabler/icons-react'
 import { TestcallfromcustomconnectorService } from './generated/services/TestcallfromcustomconnectorService'
 import './App.css'
@@ -99,11 +103,156 @@ function EquipmentCard({ item, idx }: { item: EquipmentItem; idx: number }) {
   )
 }
 
+/* ── Chart colors ─────────────────────────────────────────── */
+const CHART_COLORS = [
+  '#6366f1', '#3b82f6', '#06b6d4', '#10b981', '#f59e0b',
+  '#ef4444', '#ec4899', '#8b5cf6', '#14b8a6', '#f97316',
+]
+
+/* ── Donut chart (pure SVG) ───────────────────────────────── */
+function CategoryDonut({ data }: { data: { label: string; count: number; color: string }[] }) {
+  const total = data.reduce((s, d) => s + d.count, 0)
+  if (total === 0) return null
+  const R = 60, CX = 80, CY = 80, C = 2 * Math.PI * R
+  let offset = 0
+
+  return (
+    <svg viewBox="0 0 160 160" className="w-48 h-48 mx-auto">
+      {data.map((d) => {
+        const pct = d.count / total
+        const dash = pct * C
+        const gap = C - dash
+        const cur = offset
+        offset += dash
+        return (
+          <circle
+            key={d.label}
+            cx={CX} cy={CY} r={R}
+            fill="none"
+            stroke={d.color}
+            strokeWidth={24}
+            strokeDasharray={`${dash} ${gap}`}
+            strokeDashoffset={-cur}
+            className="transition-all duration-500"
+          />
+        )
+      })}
+      <text x={CX} y={CY - 6} textAnchor="middle" className="fill-gray-800 text-2xl font-bold">{total}</text>
+      <text x={CX} y={CY + 14} textAnchor="middle" className="fill-gray-400 text-[11px]">פריטים</text>
+    </svg>
+  )
+}
+
+/* ── Side Drawer ──────────────────────────────────────────── */
+function CategoryDrawer({
+  open,
+  onClose,
+  items,
+}: {
+  open: boolean
+  onClose: () => void
+  items: EquipmentItem[]
+}) {
+  const chartData = useMemo(() => {
+    const map = new Map<string, number>()
+    items.forEach((it) => {
+      const cat = it.category ?? 'ללא קטגוריה'
+      map.set(cat, (map.get(cat) ?? 0) + 1)
+    })
+    return Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, count], i) => ({ label, count, color: CHART_COLORS[i % CHART_COLORS.length] }))
+  }, [items])
+
+  const statusData = useMemo(() => {
+    const map = new Map<string, number>()
+    items.forEach((it) => {
+      const st = it.status ?? 'לא ידוע'
+      map.set(st, (map.get(st) ?? 0) + 1)
+    })
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1])
+  }, [items])
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className={`fixed inset-0 bg-black/30 backdrop-blur-[2px] z-30 transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={onClose}
+      />
+      {/* Drawer */}
+      <div
+        className={`fixed top-0 left-0 h-full w-[340px] sm:w-[400px] bg-white shadow-2xl z-40 transform transition-transform duration-300 ease-out overflow-y-auto ${open ? 'translate-x-0' : '-translate-x-full'}`}
+        dir="rtl"
+      >
+        <div className="sticky top-0 bg-white/90 backdrop-blur-md border-b border-gray-100 px-5 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <IconChartPie size={20} className="text-indigo-500" />
+            <h2 className="font-bold text-gray-900">פילוח ציוד</h2>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+            <IconX size={18} className="text-gray-400" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-6">
+          {/* Donut chart */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">לפי קטגוריה</h3>
+            <CategoryDonut data={chartData} />
+            {/* Legend */}
+            <div className="mt-4 space-y-2">
+              {chartData.map((d) => (
+                <div key={d.label} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+                    <span className="text-gray-700 truncate">{d.label}</span>
+                  </div>
+                  <span className="font-semibold text-gray-900 shrink-0">{d.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Status breakdown */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">לפי סטטוס</h3>
+            <div className="space-y-2">
+              {statusData.map(([st, count]) => {
+                const pct = items.length > 0 ? Math.round((count / items.length) * 100) : 0
+                const cfg = getStatusCfg(st)
+                return (
+                  <div key={st}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <StatusBadge status={st} />
+                      <span className="text-xs text-gray-500">{count} ({pct}%)</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${cfg.dot}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 export default function App() {
   const [items, setItems] = useState<EquipmentItem[]>([])
   const [loadState, setLoadState] = useState<LoadState>('idle')
   const [error, setError] = useState<string>('')
   const [search, setSearch] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [locationFilter, setLocationFilter] = useState('')
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   async function fetchEquipment() {
     setLoadState('loading')
@@ -133,7 +282,17 @@ export default function App() {
 
   useEffect(() => { fetchEquipment() }, [])
 
+  // Unique values for filter dropdowns
+  const categories = useMemo(() => [...new Set(items.map((i) => i.category).filter(Boolean))].sort(), [items])
+  const statuses = useMemo(() => [...new Set(items.map((i) => i.status).filter(Boolean))].sort(), [items])
+  const locations = useMemo(() => [...new Set(items.map((i) => i.location).filter(Boolean))].sort(), [items])
+
+  const hasActiveFilters = categoryFilter || statusFilter || locationFilter
+
   const filtered = items.filter((item) => {
+    if (categoryFilter && item.category !== categoryFilter) return false
+    if (statusFilter && item.status !== statusFilter) return false
+    if (locationFilter && item.location !== locationFilter) return false
     if (!search) return true
     const q = search.toLowerCase()
     return [item.name, item.category, item.description, item.serial_number, item.status, item.location, item.assigned_to]
@@ -174,23 +333,87 @@ export default function App() {
         </div>
       </header>
 
+      {/* Drawer */}
+      <CategoryDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} items={items} />
+
       {/* Toolbar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="relative w-full sm:max-w-xs">
-          <IconSearch size={15} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="חיפוש ציוד..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pr-8 pl-3 py-2 border border-gray-200 rounded-lg text-sm bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition"
-          />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-3 relative z-10">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          {/* Search */}
+          <div className="relative w-full sm:max-w-xs">
+            <IconSearch size={15} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="חיפוש חופשי..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pr-8 pl-3 py-2 border border-gray-200 rounded-lg text-sm bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Category filter */}
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="border border-gray-200 rounded-lg text-sm bg-white px-2.5 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition cursor-pointer"
+            >
+              <option value="">כל הקטגוריות</option>
+              {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+
+            {/* Status filter */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="border border-gray-200 rounded-lg text-sm bg-white px-2.5 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition cursor-pointer"
+            >
+              <option value="">כל הסטטוסים</option>
+              {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+
+            {/* Location filter */}
+            <select
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
+              className="border border-gray-200 rounded-lg text-sm bg-white px-2.5 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition cursor-pointer"
+            >
+              <option value="">כל המיקומים</option>
+              {locations.map((l) => <option key={l} value={l}>{l}</option>)}
+            </select>
+
+            {/* Clear filters */}
+            {hasActiveFilters && (
+              <button
+                onClick={() => { setCategoryFilter(''); setStatusFilter(''); setLocationFilter('') }}
+                className="inline-flex items-center gap-1 text-sm text-red-500 hover:text-red-700 transition-colors cursor-pointer"
+              >
+                <IconFilterOff size={15} />
+                <span>נקה פילטרים</span>
+              </button>
+            )}
+          </div>
+
+          {/* Spacer + Chart button + Count */}
+          <div className="flex items-center gap-3 sm:mr-auto">
+            <button
+              onClick={() => setDrawerOpen(true)}
+              disabled={items.length === 0}
+              className="inline-flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-medium px-3 py-2 rounded-lg transition-colors disabled:opacity-40 cursor-pointer"
+            >
+              <IconChartPie size={16} />
+              <span className="hidden sm:inline">פילוח</span>
+            </button>
+            {loadState === 'loaded' && (
+              <span className="text-sm text-gray-500">
+                {filtered.length} פריט{filtered.length !== 1 ? 'ים' : ''}
+                {hasActiveFilters && <span className="text-indigo-500 mr-1">
+                  <IconFilter size={13} className="inline -mt-0.5" /> מסונן
+                </span>}
+              </span>
+            )}
+          </div>
         </div>
-        {loadState === 'loaded' && (
-          <span className="text-sm text-gray-500">
-            {filtered.length} פריט{filtered.length !== 1 ? 'ים' : ''}
-          </span>
-        )}
       </div>
 
       {/* Main */}
