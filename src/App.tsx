@@ -10,6 +10,10 @@ import {
   IconX,
   IconFilter,
   IconFilterOff,
+  IconLock,
+  IconPlayerPause,
+  IconWifiOff,
+  IconServerOff,
 } from '@tabler/icons-react'
 import { TestcallfromcustomconnectorService } from './generated/services/TestcallfromcustomconnectorService'
 import './App.css'
@@ -29,6 +33,96 @@ interface EquipmentItem {
 }
 
 type LoadState = 'idle' | 'loading' | 'loaded' | 'error'
+type ErrorType = 'permission' | 'flow-off' | 'network' | 'timeout' | 'server' | 'unknown'
+
+interface AppError {
+  type: ErrorType
+  message: string
+  detail?: string
+}
+
+function classifyError(err: unknown): AppError {
+  const msg = err instanceof Error ? err.message : String(err)
+  const lower = msg.toLowerCase()
+
+  // Permission / authorization errors
+  if (lower.includes('403') || lower.includes('forbidden') || lower.includes('unauthorized') ||
+      lower.includes('401') || lower.includes('permission') || lower.includes('access denied') ||
+      lower.includes('insufficient')) {
+    return {
+      type: 'permission',
+      message: 'אין הרשאה להפעיל את ה-Flow',
+      detail: 'ודא שיש לך הרשאות מתאימות ל-Flow ול-Connection ב-Power Automate. פנה למנהל המערכת.',
+    }
+  }
+
+  // Flow turned off / not found
+  if (lower.includes('flow is not') || lower.includes('turned off') || lower.includes('disabled') ||
+      lower.includes('not found') || lower.includes('404') || lower.includes('does not exist') ||
+      lower.includes('workflow') || lower.includes('invalidworkflow') || lower.includes('suspended')) {
+    return {
+      type: 'flow-off',
+      message: 'ה-Flow כבוי או לא נמצא',
+      detail: 'יש להפעיל את ה-Flow ב-Power Automate (Turn On) או לוודא שהוא קיים באותה Solution.',
+    }
+  }
+
+  // Network / connectivity
+  if (lower.includes('network') || lower.includes('fetch') || lower.includes('econnrefused') ||
+      lower.includes('offline') || lower.includes('dns') || lower.includes('cors') ||
+      lower.includes('err_internet') || lower.includes('failed to fetch')) {
+    return {
+      type: 'network',
+      message: 'בעיית תקשורת',
+      detail: 'אין חיבור לשרת Power Platform. בדוק את חיבור האינטרנט ונסה שוב.',
+    }
+  }
+
+  // Timeout
+  if (lower.includes('timeout') || lower.includes('timed out') || lower.includes('deadline')) {
+    return {
+      type: 'timeout',
+      message: 'ה-Flow לא הגיב בזמן',
+      detail: 'ה-Flow חרג ממגבלת הזמן. ייתכן שהוא מבצע פעולה כבדה מדי. נסה שוב מאוחר יותר.',
+    }
+  }
+
+  // Server / 500 errors
+  if (lower.includes('500') || lower.includes('internal server') || lower.includes('502') ||
+      lower.includes('503') || lower.includes('bad gateway') || lower.includes('service unavailable')) {
+    return {
+      type: 'server',
+      message: 'שגיאת שרת',
+      detail: 'שגיאה פנימית בשרת Power Platform. הבעיה עלולה להיות זמנית — נסה שוב בעוד מספר דקות.',
+    }
+  }
+
+  return {
+    type: 'unknown',
+    message: 'שגיאה בטעינת הנתונים',
+    detail: msg,
+  }
+}
+
+function getErrorIcon(type: ErrorType) {
+  switch (type) {
+    case 'permission': return <IconLock size={30} className="text-red-400 shrink-0 self-center" />
+    case 'flow-off': return <IconPlayerPause size={30} className="text-amber-500 shrink-0 self-center" />
+    case 'network': return <IconWifiOff size={30} className="text-orange-400 shrink-0 self-center" />
+    case 'timeout': return <IconServerOff size={30} className="text-orange-400 shrink-0 self-center" />
+    case 'server': return <IconServerOff size={30} className="text-red-400 shrink-0 self-center" />
+    default: return <IconAlertCircle size={30} className="text-red-400 shrink-0 self-center" />
+  }
+}
+
+function getErrorColors(type: ErrorType) {
+  switch (type) {
+    case 'flow-off': return { bg: 'bg-amber-50', border: 'border-amber-200', title: 'text-amber-800', text: 'text-amber-600', btn: 'bg-amber-600 hover:bg-amber-700' }
+    case 'network': 
+    case 'timeout': return { bg: 'bg-orange-50', border: 'border-orange-200', title: 'text-orange-800', text: 'text-orange-600', btn: 'bg-orange-600 hover:bg-orange-700' }
+    default: return { bg: 'bg-red-50', border: 'border-red-200', title: 'text-red-800', text: 'text-red-600', btn: 'bg-red-600 hover:bg-red-700' }
+  }
+}
 
 function getStatusCfg(status: string): { badge: string; dot: string } {
   if (status === 'פעיל' || status === 'זמין' || status === 'available') {
@@ -247,7 +341,7 @@ function CategoryDrawer({
 export default function App() {
   const [items, setItems] = useState<EquipmentItem[]>([])
   const [loadState, setLoadState] = useState<LoadState>('idle')
-  const [error, setError] = useState<string>('')
+  const [appError, setAppError] = useState<AppError | null>(null)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -256,7 +350,7 @@ export default function App() {
 
   async function fetchEquipment() {
     setLoadState('loading')
-    setError('')
+    setAppError(null)
     try {
       const result = await TestcallfromcustomconnectorService.Run({})
       const raw = result.data?.response
@@ -275,7 +369,7 @@ export default function App() {
       }
       setLoadState('loaded')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'שגיאה בטעינת הנתונים')
+      setAppError(classifyError(err))
       setLoadState('error')
     }
   }
@@ -427,21 +521,47 @@ export default function App() {
           </div>
         )}
 
-        {loadState === 'error' && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-            <IconAlertCircle size={30} className="text-red-400 shrink-0 self-center" />
-            <div className="flex-1 text-center sm:text-right">
-              <p className="font-semibold text-red-800">שגיאה בטעינה</p>
-              <p className="text-sm text-red-600 mt-0.5">{error}</p>
+        {loadState === 'error' && appError && (() => {
+          const colors = getErrorColors(appError.type)
+          return (
+            <div className={`${colors.bg} border ${colors.border} rounded-2xl p-5 flex flex-col gap-4`}>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                {getErrorIcon(appError.type)}
+                <div className="flex-1 text-center sm:text-right">
+                  <p className={`font-semibold ${colors.title}`}>{appError.message}</p>
+                  {appError.detail && (
+                    <p className={`text-sm ${colors.text} mt-1 leading-relaxed`}>{appError.detail}</p>
+                  )}
+                </div>
+                <button
+                  onClick={fetchEquipment}
+                  className={`self-center sm:self-auto ${colors.btn} text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer`}
+                >
+                  נסה שוב
+                </button>
+              </div>
+              {(appError.type === 'permission' || appError.type === 'flow-off') && (
+                <div className={`text-xs ${colors.text} border-t ${colors.border} pt-3 space-y-1`}>
+                  <p className="font-medium">💡 מה לעשות?</p>
+                  {appError.type === 'permission' && (
+                    <ul className="list-disc list-inside space-y-0.5 mr-4">
+                      <li>ודא שה-Connection של ה-Flow פעיל ומאושר</li>
+                      <li>בדוק שיש לך הרשאות Run ב-Solution</li>
+                      <li>פנה למנהל Power Platform לאישור גישה</li>
+                    </ul>
+                  )}
+                  {appError.type === 'flow-off' && (
+                    <ul className="list-disc list-inside space-y-0.5 mr-4">
+                      <li>פתח את Power Automate ← Solutions ← מצא את ה-Flow</li>
+                      <li>לחץ על "Turn On" להפעלת ה-Flow</li>
+                      <li>ודא שה-Flow באותה Solution שבה ה-App</li>
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
-            <button
-              onClick={fetchEquipment}
-              className="self-center sm:self-auto bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer"
-            >
-              נסה שוב
-            </button>
-          </div>
-        )}
+          )
+        })()}
 
         {loadState === 'loaded' && filtered.length === 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-14 flex flex-col items-center gap-3 text-gray-400">
